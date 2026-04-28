@@ -259,7 +259,7 @@ on:
           - elecom_wrc-1167gst2
           - elecom_wrc-1750gs
           - elecom_wrc-1750gst2
-          - elecom_wrc-1750gsv
+          - elecom_wrc-1750gsV
           - elecom_wrc-1900gst
           - elecom_wrc-2533ghbk-i
           - elecom_wrc-2533gs2
@@ -518,14 +518,21 @@ on:
         description: "宽带密码 (若启用PPPoE)"
         required: false
 
+# 🔥 解决 Release 403 权限错误的关键
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      # 🔥 强制使用 Node.js 24，彻底消除弃用警告
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 🔥 升级到 v4，修复 Node20 警告
 
       - name: Set executable permissions
         run: |
@@ -537,7 +544,6 @@ jobs:
           echo "${{ github.event.inputs.custom_router_ip }}" > "${{ github.workspace }}/custom/custom_router_ip.txt"
           echo "您设置的路由器管理地址是:${{ github.event.inputs.custom_router_ip }}"
           # 后续步骤会将该文件映射到路由器/etc/config/custom_router_ip.txt 以便用于开机脚本99-custom.sh读取用户设置的ip
-
 
       - name: Validate PPPoE Inputs
         run: |
@@ -556,7 +562,6 @@ jobs:
           else
             echo "❎ 未启用 luci-app-store"
           fi
-
 
       - name: Build Wireless ImmortalWrt
         run: |
@@ -649,7 +654,6 @@ jobs:
               -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
             immortalwrt/imagebuilder:$tag /bin/bash /home/build/immortalwrt/build.sh
           
-
       - name: Create info
         run: |
           if [ "${{ github.event.inputs.include_docker }}" == "yes" ]; then
@@ -662,15 +666,13 @@ jobs:
           extra_content_ip="#### 管理地址 $custom_router_ip"
           echo -e "\n $extra_content_ip" >> ${{ github.workspace }}/mediatek-filogic/info.md
           
-          
       - name: Upload ImmortalWrt as release assets
-        uses: softprops/action-gh-release@v2.2.1
+        uses: softprops/action-gh-release@v2  # 🔥 升级到最新 v2，修复 Node20 警告 + 权限问题
         with:
           tag_name: ${{ github.event.inputs.profile }}
           name: ImmortalWrt-Wireless
           body_path: ${{ github.workspace }}/mediatek-filogic/info.md
           files: |
             ${{ github.workspace }}/bin/targets/${{ env.platform }}/*
-          token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
