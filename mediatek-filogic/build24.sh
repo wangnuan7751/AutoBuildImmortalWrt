@@ -56,6 +56,7 @@ PACKAGES+=" luci-i18n-package-manager-zh-cn"
 PACKAGES+=" luci-i18n-ttyd-zh-cn openssh-sftp-server"
 PACKAGES+=" luci-i18n-filemanager-zh-cn"
 PACKAGES+=" luci-app-openclash"
+PACKAGES="$PACKAGES luci-i18n-passwall-zh-cn"
 
 # 第三方软件包合并
 if [[ "$PROFILE" == "glinet_gl-axt1800" || "$PROFILE" == "glinet_gl-ax1800" ]]; then
