@@ -81,6 +81,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 🔥 消除 Node.js 20 弃用警告
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -176,5 +178,6 @@ jobs:
           files: |
             ${{ github.workspace }}/bin/targets/rockchip/armv8/*.img.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-          append: true
+          append_body: true        # 🔥 修复：正确参数
+          overwrite_files: true    # 🔥 自动覆盖旧固件
           fail_on_unmatched_files: false
