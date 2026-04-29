@@ -1,122 +1,135 @@
 name: build-rockchip-immortalWrt-23.05.4
 
+# 🔥 必加：解决 Release 上传权限错误
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
       profile:
         type: choice
-        description: |
-          输入 软路由型号 可选值如下：
+        description: "选择软路由型号（支持多选，用英文逗号 , 分隔）"
         required: true
         options:
           - ariaboard_photonicat
           - armsom_sige3
-          - ezpro_mrkaio-m68s 
-          - firefly_roc-rk3328-cc 
-          - firefly_roc-rk3568-pc 
-          - friendlyarm_nanopc-t4 
-          - friendlyarm_nanopi-r2c 
-          - friendlyarm_nanopi-r2c-plus 
-          - friendlyarm_nanopi-r2s 
-          - friendlyarm_nanopi-r4s 
-          - friendlyarm_nanopi-r4s-enterprise 
-          - friendlyarm_nanopi-r4se 
-          - friendlyarm_nanopi-r5c 
-          - friendlyarm_nanopi-r5s 
-          - huake_guangmiao-g4c 
-          - lunzn_fastrhino-r66s 
-          - lunzn_fastrhino-r68s 
-          - lyt_t68m 
-          - pine64_rockpro64 
-          - radxa_rock-pi-4a 
-          - radxa_rock-pi-e 
-          - xunlong_orangepi-r1-plus 
+          - ezpro_mrkaio-m68s
+          - firefly_roc-rk3328-cc
+          - firefly_roc-rk3568-pc
+          - friendlyarm_nanopc-t4
+          - friendlyarm_nanopi-r2c
+          - friendlyarm_nanopi-r2c-plus
+          - friendlyarm_nanopi-r2s
+          - friendlyarm_nanopi-r4s
+          - friendlyarm_nanopi-r4s-enterprise
+          - friendlyarm_nanopi-r4se
+          - friendlyarm_nanopi-r5c
+          - friendlyarm_nanopi-r5s
+          - huake_guangmiao-g4c
+          - lunzn_fastrhino-r66s
+          - lunzn_fastrhino-r68s
+          - lyt_t68m
+          - pine64_rockpro64
+          - radxa_rock-pi-4a
+          - radxa_rock-pi-e
+          - xunlong_orangepi-r1-plus
           - xunlong_orangepi-r1-plus-lts
         default: 'friendlyarm_nanopi-r4s'
+
       rootfs_partsize:
-        description: '设置软件包大小 单位(MB)'
+        description: '固件分区大小 (MB)'
         required: true
         default: '1024'
+
       custom_router_ip:
-        description: "请设置软路由的管理地址(注意仅对多网口软路由有效) 格式:192.168.x.1 或 10.x.x.1"
+        description: "管理IP地址 (例：192.168.100.1)"
         required: true
         default: "192.168.100.1"
+
       enable_store:
-        description: "集成 store 商店"
+        description: "集成 luci-app-store 应用商店"
         required: false
         type: boolean
         default: true
+
       include_docker:
-        description: |
-          是否编译 Docker 插件
+        description: "是否编译 Docker"
         required: true
         default: 'yes'
         type: choice
         options:
           - 'yes'
           - 'no'
+
       enable_pppoe:
-        description: "是否配置PPPoE拨号信息?"
+        description: "是否预置 PPPoE 拨号信息"
         required: true
         default: 'no'
         type: choice
         options:
-        - 'yes'
-        - 'no'
+          - 'yes'
+          - 'no'
+
       pppoe_account:
-        description: "宽带账号 (若启用PPPoE)"
+        description: "PPPoE 宽带账号（启用才填）"
         required: false
+
       pppoe_password:
-        description: "宽带密码 (若启用PPPoE)"
+        description: "PPPoE 宽带密码（启用才填）"
         required: false
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set executable permissions
-        run: chmod +x ${{ github.workspace }}/rockchip/build23.sh
-      
-      - name: Save Custom Router IP into OpenWrt files
+        run: chmod +x "${{ github.workspace }}/rockchip/build23.sh"
+
+      - name: Save custom router IP
         run: |
           mkdir -p "${{ github.workspace }}/custom"
           echo "${{ github.event.inputs.custom_router_ip }}" > "${{ github.workspace }}/custom/custom_router_ip.txt"
-          echo "您设置的Rockchip软路由管理地址是:${{ github.event.inputs.custom_router_ip }}"
-          # 后续步骤会将该文件映射到路由器/etc/config/custom_router_ip.txt 以便用于开机脚本99-custom.sh读取用户设置的ip
+          echo "✅ 管理地址已保存：${{ github.event.inputs.custom_router_ip }}"
 
-      - name: Validate PPPoE Inputs
+      - name: Validate PPPoE configuration
         run: |
           if [[ "${{ inputs.enable_pppoe }}" == "yes" ]]; then
             if [[ -z "${{ inputs.pppoe_account }}" || -z "${{ inputs.pppoe_password }}" ]]; then
-              echo "Error: PPPoE account and password must be provided when PPPoE is enabled!"
+              echo "❌ 错误：PPPoE 账号/密码不能为空！"
               exit 1
             fi
           fi
-      
-      - name: Enable Store integration
+
+      - name: Enable luci-app-store
         run: |
           if [ "${{ github.event.inputs.enable_store }}" == "true" ]; then
-            echo 'CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-store"' >> shell/custom-packages.sh
-            echo "✅ 已追加 luci-app-store"
+            echo 'CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-store"' >> "${{ github.workspace }}/shell/custom-packages.sh"
+            echo "✅ 已集成 luci-app-store"
           else
-            echo "❎ 未启用 luci-app-store"
+            echo "❎ 未集成应用商店"
           fi
 
-      - name: Building Rockchip ImmortalWrt
+      - name: Start building ImmortalWrt
         run: |
-          profiles="${{ github.event.inputs.profile }}"
-          include_docker="${{ github.event.inputs.include_docker }}"
-          rootfs_partsize="${{ github.event.inputs.rootfs_partsize }}"
-          
-          IFS=',' read -r -a profile_array <<< "$profiles"
-          
-          for profile in "${profile_array[@]}"; do
-            echo "Building for profile: $profile"
-            
+          PROFILES="${{ github.event.inputs.profile }}"
+          INCLUDE_DOCKER="${{ github.event.inputs.include_docker }}"
+          ROOTFS_PARTSIZE="${{ github.event.inputs.rootfs_partsize }}"
+          ENABLE_PPPOE="${{ inputs.enable_pppoe }}"
+          PPPOE_ACCOUNT="${{ inputs.pppoe_account }}"
+          PPPOE_PASSWORD="${{ inputs.pppoe_password }}"
+
+          IFS=',' read -r -a PROFILE_ARRAY <<< "$PROFILES"
+
+          for PROFILE in "${PROFILE_ARRAY[@]}"; do
+            PROFILE=$(echo "$PROFILE" | xargs)
+            echo -e "\n========================================"
+            echo "  编译设备：$PROFILE"
+            echo -e "========================================\n"
+
             docker run --rm -i \
               --user root \
               -v "${{ github.workspace }}/bin:/home/build/immortalwrt/bin" \
@@ -124,42 +137,45 @@ jobs:
               -v "${{ github.workspace }}/arch/arch.conf:/home/build/immortalwrt/files/etc/opkg/arch.conf" \
               -v "${{ github.workspace }}/rockchip/imm.config:/home/build/immortalwrt/.config" \
               -v "${{ github.workspace }}/shell:/home/build/immortalwrt/shell" \
+              -v "${{ github.workspace }}/custom:/home/build/immortalwrt/custom" \
               -v "${{ github.workspace }}/rockchip/build23.sh:/home/build/immortalwrt/build.sh" \
-              -e PROFILE=$profile \
-              -e INCLUDE_DOCKER=$include_docker \
-              -e ROOTFS_PARTSIZE=$rootfs_partsize \
-              -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
-              -e PPPOE_ACCOUNT=${{ inputs.pppoe_account }} \
-              -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
-              immortalwrt/imagebuilder:rockchip-armv8-openwrt-23.05.4 /bin/bash /home/build/immortalwrt/build.sh
+              -e PROFILE="$PROFILE" \
+              -e INCLUDE_DOCKER="$INCLUDE_DOCKER" \
+              -e ROOTFS_PARTSIZE="$ROOTFS_PARTSIZE" \
+              -e ENABLE_PPPOE="$ENABLE_PPPOE" \
+              -e PPPOE_ACCOUNT="$PPPOE_ACCOUNT" \
+              -e PPPOE_PASSWORD="$PPPOE_PASSWORD" \
+              immortalwrt/imagebuilder:rockchip-armv8-openwrt-23.05.4 \
+              /bin/bash /home/build/immortalwrt/build.sh
+
+            if [ $? -ne 0 ]; then
+              echo "❌ 编译失败：$PROFILE"
+              exit 1
+            fi
           done
 
-      - name: Create info
+      - name: Generate info.md
         run: |
-          cat > ${{ github.workspace }}/router-info.md <<EOF
-          ## 📡 路由器后台信息
-
-          - ✳️ **软路由型号**: ${{ github.event.inputs.profile }}
-          - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
-          - 👤 **用户名**: root
-          - 🔑 **密码**: 无
+          cat > "${{ github.workspace }}/router-info.md" << EOF
+          ## ImmortalWrt 自动编译信息
+          - 设备型号：${{ github.event.inputs.profile }}
+          - 管理地址：${{ github.event.inputs.custom_router_ip }}
+          - 分区大小：${{ github.event.inputs.rootfs_partsize }} MB
+          - 集成 Docker：${{ github.event.inputs.include_docker }}
+          - 集成商店：${{ github.event.inputs.enable_store }}
+          - 预置 PPPoE：${{ github.event.inputs.enable_pppoe }}
+          - 用户名：root
+          - 密码：无（空）
           EOF
 
-          if [ "${{ github.event.inputs.include_docker }}" == "yes" ]; then
-            extra_content="#### 默认带docker"
-            echo -e "\n$extra_content" >> ${{ github.workspace }}/router-info.md
-          else
-            echo -e "\n#### 不带docker" >> ${{ github.workspace }}/router-info.md
-          fi
-
-      - name: Upload ImmortWrt as release assets
-        uses: softprops/action-gh-release@v2.2.1
+      - name: Upload firmware to Release
+        uses: softprops/gh-release@v2
         with:
           tag_name: Autobuild-23.05.4
-          name: ImmortWrt-Rockchip
+          name: ImmortalWrt-Rockchip-armv8
           body_path: ${{ github.workspace }}/router-info.md
           files: |
             ${{ github.workspace }}/bin/targets/rockchip/armv8/*.img.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          append: true
+          fail_on_unmatched_files: false
